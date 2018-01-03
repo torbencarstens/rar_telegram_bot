@@ -1,9 +1,6 @@
 import requests
 from bs4 import BeautifulSoup
 
-chat_id = 12324231
-
-
 def get_band_names():
     content = requests.get("http://rock-am-ring.de/lineup").content
     soup = BeautifulSoup(content, 'html.parser')
