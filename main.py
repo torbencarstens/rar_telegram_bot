@@ -62,13 +62,11 @@ def get_band_url(band_name):
 
     url = "http://www.rock-am-ring.com/lineup/{}".format(name)
     if not requests.get(url).ok:
-        print('{} not ok'.format(url))
         url = "http://www.rock-am-ring.com/lineup/{}-1".format(name)
         if not requests.get(url).ok:
             print('{} not ok - return None'.format(url))
             return None
 
-    print('return {}'.format(url))
     return url
 
 
@@ -109,7 +107,6 @@ def removed_bands(_bot: Bot, update):
     bot = _bot
     bands = get_new(update.message.chat_id)['removed']
     if bands:
-        print("Bands: {}".format(bands))
         bot.send_message(chat_id=update.message.chat_id, text=get_sendable_bands_string(bands), parse_mode=telegram.ParseMode.MARKDOWN, disable_web_page_preview=True)
     else:
         bot.send_message(chat_id=update.message.chat_id, text="Es wurden keine Bands abgesagt.")
@@ -162,6 +159,7 @@ if __name__ == "__main__":
         dispatcher.add_handler(CommandHandler("neu", new_bands))
         dispatcher.add_handler(CommandHandler("abgesagt", removed_bands))
         dispatcher.add_handler(CommandHandler("start", start))
+        dispatcher.add_handler(CommandHandler("status", lambda b, u: b.send_messsage(u.message.chat_id, text="Ok")))
 
         updater.start_polling()
     except Exception as e:
