@@ -36,8 +36,8 @@ def get_bands(id):
 def get_old(id):
     try:
         with open("bands_{}".format(id), "r") as old_bands_fd:
-            return old_bands_fd.readlines()
-    except OSError:
+            return [band.strip() for band in old_bands_fd.readlines()]
+    except OSError as e:
         return []
 
 
