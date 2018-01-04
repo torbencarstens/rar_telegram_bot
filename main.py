@@ -159,7 +159,7 @@ if __name__ == "__main__":
         dispatcher.add_handler(CommandHandler("neu", new_bands))
         dispatcher.add_handler(CommandHandler("abgesagt", removed_bands))
         dispatcher.add_handler(CommandHandler("start", start))
-        dispatcher.add_handler(CommandHandler("status", lambda b, u: b.send_messsage(u.message.chat_id, text="Ok")))
+        dispatcher.add_handler(CommandHandler("status", lambda b, u: b.send_message(chat_id=u.message.chat_id, text="Ok")))
 
         updater.start_polling()
     except Exception as e:
