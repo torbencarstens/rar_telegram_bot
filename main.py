@@ -82,7 +82,7 @@ class RockAmRing(Bot):
         if check and not requests.get(url).ok:
             url = "http://www.rock-am-ring.com/lineup/{}-1".format(name)
             if not requests.get(url).ok:
-                print('{} not ok - return None'.format(url))
+                print('{} not ok for {} - return None'.format(url, band_name))
                 return None
 
         return url
