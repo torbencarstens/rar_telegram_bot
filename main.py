@@ -1,5 +1,13 @@
+import json
+import re
+import threading
+
 import requests
+import telegram
 from bs4 import BeautifulSoup
+from telegram.bot import Bot
+from telegram.ext import CommandHandler, Updater
+
 
 def get_band_names():
     content = requests.get("http://rock-am-ring.de/lineup").content
@@ -13,13 +21,6 @@ def get_band_names():
             band_names.append(span.text.strip())
     return band_names
 
-
-import json
-import re
-import threading
-import telegram
-from telegram.bot import Bot
-from telegram.ext import CommandHandler, Updater
 
 bot = None
 
@@ -87,7 +88,8 @@ def bands(_bot: Bot, update):
     bands = get_bands(update.message.chat_id)
 
     if bands:
-        bot.send_message(chat_id=update.message.chat_id, text=get_sendable_bands_string(bands), parse_mode=telegram.ParseMode.MARKDOWN, disable_web_page_preview=True)
+        bot.send_message(chat_id=update.message.chat_id, text=get_sendable_bands_string(bands),
+                         parse_mode=telegram.ParseMode.MARKDOWN, disable_web_page_preview=True)
     else:
         bot.send_message(chat_id=update.message.chat_id, text="Bisher wurden keine Bands announced.")
 
@@ -97,7 +99,8 @@ def new_bands(_bot: Bot, update):
     bot = _bot
     bands = get_new(update.message.chat_id)['new']
     if bands:
-        bot.send_message(chat_id=update.message.chat_id, text=get_sendable_bands_string(bands), parse_mode=telegram.ParseMode.MARKDOWN, disable_web_page_preview=True)
+        bot.send_message(chat_id=update.message.chat_id, text=get_sendable_bands_string(bands),
+                         parse_mode=telegram.ParseMode.MARKDOWN, disable_web_page_preview=True)
     else:
         bot.send_message(chat_id=update.message.chat_id, text="Es wurden keine neuen Bands announced.")
 
@@ -107,7 +110,8 @@ def removed_bands(_bot: Bot, update):
     bot = _bot
     bands = get_new(update.message.chat_id)['removed']
     if bands:
-        bot.send_message(chat_id=update.message.chat_id, text=get_sendable_bands_string(bands), parse_mode=telegram.ParseMode.MARKDOWN, disable_web_page_preview=True)
+        bot.send_message(chat_id=update.message.chat_id, text=get_sendable_bands_string(bands),
+                         parse_mode=telegram.ParseMode.MARKDOWN, disable_web_page_preview=True)
     else:
         bot.send_message(chat_id=update.message.chat_id, text="Es wurden keine Bands abgesagt.")
 
@@ -132,7 +136,8 @@ def sched_new():
             if id:
                 bands = get_new(id)['new']
                 if bands:
-                    bot.send_message(chat_id=id, text=get_sendable_bands_string(bands), parse_mode=telegram.ParseMode.MARKDOWN, disable_web_page_preview=True)
+                    bot.send_message(chat_id=id, text=get_sendable_bands_string(bands),
+                                     parse_mode=telegram.ParseMode.MARKDOWN, disable_web_page_preview=True)
         except IndexError:
             pass
 
@@ -159,7 +164,8 @@ if __name__ == "__main__":
         dispatcher.add_handler(CommandHandler("neu", new_bands))
         dispatcher.add_handler(CommandHandler("abgesagt", removed_bands))
         dispatcher.add_handler(CommandHandler("start", start))
-        dispatcher.add_handler(CommandHandler("status", lambda b, u: b.send_message(chat_id=u.message.chat_id, text="Ok")))
+        dispatcher.add_handler(
+            CommandHandler("status", lambda b, u: b.send_message(chat_id=u.message.chat_id, text="Ok")))
 
         updater.start_polling()
     except Exception as e:
