@@ -1,139 +1,218 @@
 import json
 import re
 import threading
+import time
 from typing import Dict, List, Iterable, Optional
 
 import requests
-import telegram
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 from telegram.bot import Bot
 from telegram.ext import CommandHandler, Updater
+from telegram.parsemode import ParseMode
 
 
-class RockAmRing(Bot):
-    bot = None
+def read_latest():
+    from datetime import datetime
+    fmt = "%H:%M:%S"
 
-    def __init__(self, token: str):
-        if not token or token == "<YOUR_TOKEN>":
-            raise ValueError("`token` must have a valid value ({} given).".format(token))
-        super().__init__(token)
+    bands = []
+    with open('latest', 'r') as fd:
+        timestamp = datetime.strptime(time.strftime(fmt), fmt) - datetime.strptime(fd.readline().strip(), fmt)
+        if timestamp.total_seconds() > 3600:
+            return None
+        for line in fd.readlines():
+            try:
+                bands.append(Band.from_line(line))
+            except ValueError:
+                pass
 
-    @staticmethod
-    def get_band_names() -> List[str]:
-        content = requests.get("http://rock-am-ring.de/lineup").content
-        soup = BeautifulSoup(content, 'html.parser')
-        band_divs = soup.findAll("div", {"class": "Label"})
-        band_names = []
+    return bands
 
-        for div in band_divs:
-            span = div.find('span')
-            if span:
-                band_names.append(span.text.strip())
 
-        return band_names
+def write_latest(bands):
+    timestamp = time.strftime("%H:%M:%S")
 
-    def send_bands(self, uid: str, bands: Iterable[str]):
-        self.send_message(chat_id=uid, text=self.get_sendable_bands_string(bands),
-                          parse_mode=telegram.ParseMode.MARKDOWN, disable_web_page_preview=True)
+    with open("latest", "a+") as fd:
+        fd.write(timestamp)
+        fd.write("\n".join(bands))
 
-    @staticmethod
-    def write_bands(uid: str, bands: Iterable[str]):
-        with open("bands_{}".format(uid), "w+") as fd:
+
+class Band:
+    def __init__(self, name: str, url: str):
+        self.name = name
+        self.url = url
+
+    @classmethod
+    def from_soup(cls, div: Tag):
+        span = div.find('span')
+        link = div.find('a', {'class': 'BandBlock-link'})
+
+        if not link or not span:
+            raise ValueError("Couldn't find name/url tag in band div")
+
+        name = span.text
+        url = "https://rock-am-ring.de{}".format(link.get('href'))
+
+        return cls(name, url)
+
+    @classmethod
+    def from_line(cls, line: str):
+        url, name = line.split(' ', 1)
+
+        return cls(name, url)
+
+    def __str__(self):
+        if not self.url:
+            return self.name
+
+        return "[{}]({})".format(self.name, self.url)
+
+
+class Message:
+    def __init__(self, uid: str, bot: Bot, content: List[str] = None):
+        self.content = content
+        self.uid = uid
+        self.bot = bot
+
+    def _split(self, content: List[str] = None, seperator: str = "\n") -> List[str]:
+        if not content and not self.content:
+            return []
+
+        max_length = 4096
+        messages = []
+        current = ""
+
+        for item in content:
+            if len(current) + len(item) > max_length:
+                messages.append(current)
+                current = ""
+
+            current = seperator.join([current, item])
+
+        return messages
+
+    def send_bands(self, bands: Iterable[Band]):
+        if bands:
+            self.send([str(band) for band in bands], parse_mode=ParseMode.MARKDOWN)
+        else:
+            self.send(["Keine neuen Announcements."])
+
+    def send(self, content: List[str], *, parse_mode=None, disable_web_page_preview=False):
+        if not content:
+            content = self.content
+
+        messages = self._split(content)
+
+        first = True
+        for message in messages:
+            self.bot.send_message(chat_id=self.uid,
+                                  text=message,
+                                  parse_mode=parse_mode,
+                                  disable_web_page_preview=disable_web_page_preview,
+                                  disable_notification=not first)
+            first = False
+
+
+# noinspection PyShadowingNames
+class User:
+    def __init__(self, uid):
+        self.id = uid
+
+    def write_bands(self, bands: Iterable[str]):
+        with open("bands_{}".format(self.id), "w+") as fd:
             fd.write("\n".join(bands))
 
-    def get_bands(self, uid: str) -> List[str]:
-        bands = self.get_band_names()
-
-        self.write_bands(uid, bands)
-
-        return bands
-
-    @staticmethod
-    def get_old(uid: str) -> List[str]:
+    def get_old_bands(self):
         try:
-            with open("bands_{}".format(uid), "r") as old_bands_fd:
+            with open("bands_{}".format(self.id), "r") as old_bands_fd:
                 return [band.strip() for band in old_bands_fd.readlines()]
         except OSError:
             return []
 
-    def get_new(self, uid: str) -> Dict[str, set]:
-        old_bands = self.get_old(uid)
-        current_bands = self.get_bands(uid)
-        removed = set()
+    def get_new_bands(self, bands: Iterable[Band]) -> Iterable[Band]:
+        return set(bands).difference(set(self.get_old_bands()))
 
-        for old_band in old_bands:
-            if old_band not in current_bands:
-                removed.add(old_band)
 
-        new_bands = set(current_bands).difference(old_bands)
+# noinspection PyShadowingNames
+class Users(list):
+    def __init__(self):
+        super().__init__()
 
-        return {"new": new_bands, "removed": removed}
+    def get(self, uid: str):
+        try:
+            return next(filter(lambda user: user.id == uid, self))
+        except StopIteration:
+            return None
 
-    def get_removed(self, uid: str) -> List[str]:
-        return list(self.get_new(uid)['removed'])
 
-    @staticmethod
-    def get_band_url(band_name: str, check=True) -> Optional[str]:
-        name = "-".join(band_name.split())
-        name = name.lower().replace("&", "und")
-        name = re.sub("[^a-z0-9-]", "", name)
+# noinspection PyShadowingNames
+class RockAmRing(Bot):
+    def __init__(self, token: str):
+        if not token or token == "<YOUR_TOKEN>":
+            raise ValueError("`token` must have a valid value ({} given).".format(token))
 
-        url = "http://www.rock-am-ring.com/lineup/{}".format(name)
-        if check and not requests.get(url).ok:
-            url = "http://www.rock-am-ring.com/lineup/{}-1".format(name)
-            if not requests.get(url).ok:
-                print('{} not ok for {} - return None'.format(url, band_name))
-                return None
-
-        return url
+        self.users = Users()
+        super().__init__(token)
 
     @staticmethod
-    def get_telegram_url_markdown(band_name: str, url: str) -> str:
-        if not url:
-            return band_name
+    def get_band_items() -> List[Band]:
+        latest = read_latest()
+        if latest:
+            return latest
 
-        return "[{}]({})".format(band_name, url)
+        content = requests.get("http://rock-am-ring.de/lineup").content
+        soup = BeautifulSoup(content, 'html.parser')
+        band_divs = soup.find_all("div", {"class": "BandBlock"})
+        bands = []
 
-    def get_sendable_bands_string(self, bands: Iterable[str]) -> str:
-        return "\n".join([self.get_telegram_url_markdown(band, self.get_band_url(band)) for band in bands])
+        for div in band_divs:
+            try:
+                bands.append(Band.from_soup(div))
+            except ValueError:
+                pass
+
+        write_latest(bands)
+
+        return bands
+
+    def send_bands(self, uid: str, bands: Iterable[Band]):
+        Message(uid, self).send_bands(bands)
+
+    def get_bands(self, uid: str) -> Iterable[Band]:
+        bands = self.get_band_items()
+
+        self.users.get(uid).write_bands(bands)
+
+        return bands
+
+    def get_new(self, uid: str):
+        bands = self.get_band_items()
+        return self.users.get(uid).get_new_bands(bands)
 
     def bands(self, update):
         uid = update.message.chat_id
         bands = self.get_bands(uid)
 
-        if bands:
-            self.send_bands(uid, bands)
-        else:
-            self.send_message(chat_id=update.message.chat_id, text="Bisher wurden keine Bands announced.")
+        self.send_bands(uid, bands)
 
     def new_bands(self, update):
         uid = update.message.chat_id
-        bands = list(self.get_new(uid)['new'])
-        if bands:
-            self.send_bands(uid, bands)
-        else:
-            self.send_message(chat_id=update.message.chat_id, text="Es wurden keine neuen Bands announced.")
-
-    def removed_bands(self, update):
-        uid = update.message.chat_id
-        bands = list(self.get_new(uid)['removed'])
-        if bands:
-            self.send_bands(uid, bands)
-        else:
-            self.send_message(chat_id=uid, text="Es wurden keine Bands abgesagt.")
+        bands = list(self.get_new(uid))
+        self.send_bands(uid, bands)
 
     def start(self, update):
         uid = update.message.chat_id
-        self.write_bands(uid, [])
+        self.users.get(uid).write_bands([])
 
 
+# noinspection PyShadowingNames
 def sched_new(rar: RockAmRing):
     import os
     for file in os.listdir("."):
         try:
             uid = re.findall(r"bands_(.*)", file)[0]
             if uid:
-                bands = rar.get_new(uid)['new']
+                bands = rar.get_new(uid)
                 if bands:
                     rar.send_bands(uid, bands)
         except IndexError:
@@ -142,6 +221,7 @@ def sched_new(rar: RockAmRing):
     schedule(rar)
 
 
+# noinspection PyShadowingNames
 def schedule(rar, time=3600):
     t = threading.Timer(time, sched_new, args=[rar])
     t.daemon = True
@@ -161,10 +241,10 @@ if __name__ == "__main__":
 
         dispatcher.add_handler(CommandHandler("bands", rar.bands))
         dispatcher.add_handler(CommandHandler("neu", rar.new_bands))
-        dispatcher.add_handler(CommandHandler("abgesagt", rar.removed_bands))
         dispatcher.add_handler(CommandHandler("start", rar.start))
         dispatcher.add_handler(
-            CommandHandler("status", lambda b, u: b.send_message(chat_id=u.message.chat_uid, text="Ok")))
+            CommandHandler("status", lambda b, u: b.send_message(chat_id=u.message.chat_id,
+                                                                 text="[{}] Ok".format(u.message.chat_id))))
 
         updater.start_polling()
     except Exception as e:
