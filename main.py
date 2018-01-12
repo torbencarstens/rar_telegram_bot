@@ -124,10 +124,10 @@ class User:
         with open("bands_{}".format(self.id), "w+") as fd:
             fd.write("\n".join([str(band) for band in bands]))
 
-    def get_old_bands(self):
+    def get_old_bands(self) -> Iterable[Band]:
         try:
             with open("bands_{}".format(self.id), "r") as old_bands_fd:
-                return [band.strip() for band in old_bands_fd.readlines()]
+                return [Band.from_line(line) for line in old_bands_fd.readlines()]
         except OSError:
             return []
 
