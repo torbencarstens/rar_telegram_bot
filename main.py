@@ -212,7 +212,13 @@ class RockAmRing(Bot):
 
     def get_new(self, uid: int):
         bands = self.get_band_items()
-        return self.users.get(uid).get_new_bands(bands)
+
+        new_bands = self.users.get(uid).get_new_bands(bands)
+
+        user = self.users.get(uid)
+        user.write_bands(bands)
+
+        return new_bands
 
     def bands(self, update):
         uid = update.message.chat_id
