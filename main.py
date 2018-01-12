@@ -62,6 +62,12 @@ class Band:
 
         return cls(name, url)
 
+    def __eq__(self, other):
+        return self.name == other.name
+
+    def __hash__(self):
+        return hash(tuple((self.name, self.url)))
+
     def __str__(self):
         if not self.url:
             return self.name
@@ -132,7 +138,9 @@ class User:
             return []
 
     def get_new_bands(self, bands: Iterable[Band]) -> Iterable[Band]:
-        return set(bands).difference(set(self.get_old_bands()))
+        old_bands = set(self.get_old_bands())
+
+        return set(bands).difference(old_bands)
 
 
 # noinspection PyShadowingNames
