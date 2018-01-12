@@ -159,7 +159,9 @@ class Users(list):
         try:
             return next(filter(lambda user: user.id == uid, self))
         except StopIteration:
-            return User(uid)
+            user = User(uid)
+            self.append(user)
+            return user
 
 
 # noinspection PyShadowingNames
