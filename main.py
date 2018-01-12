@@ -75,7 +75,7 @@ class Band:
 
 
 class Message:
-    def __init__(self, uid: str, bot: Bot, content: List[str] = None):
+    def __init__(self, uid: int, bot: Bot, content: List[str] = None):
         self.content = content
         self.uid = uid
         self.bot = bot
@@ -122,7 +122,7 @@ class Message:
 
 # noinspection PyShadowingNames
 class User:
-    def __init__(self, uid):
+    def __init__(self, uid: int):
         self.id = uid
 
     def write_bands(self, bands: Iterable[Band]):
@@ -152,9 +152,10 @@ class Users(list):
         for file in os.listdir("."):
             match = re.findall(r"bands_(-?\d+)", file)
             if match:
-                self.append(User(match))
+                uid = int(match[0])
+                self.append(User(uid))
 
-    def get(self, uid: str):
+    def get(self, uid: int):
         try:
             return next(filter(lambda user: user.id == uid, self))
         except StopIteration:
@@ -194,19 +195,20 @@ class RockAmRing(Bot):
 
         return bands
 
-    def send_bands(self, uid: str, bands: Iterable[Band]):
+    def send_bands(self, uid: int, bands: Iterable[Band]):
         bands = list(bands)
         bands.sort(key=lambda x: x.name)
         Message(uid, self).send_bands(bands)
 
-    def get_bands(self, uid: str) -> Iterable[Band]:
+    def get_bands(self, uid: int) -> Iterable[Band]:
         bands = self.get_band_items()
 
-        self.users.get(uid).write_bands(bands)
+        user = self.users.get(uid)
+        user.write_bands(bands)
 
         return bands
 
-    def get_new(self, uid: str):
+    def get_new(self, uid: int):
         bands = self.get_band_items()
         return self.users.get(uid).get_new_bands(bands)
 
@@ -233,6 +235,7 @@ def sched_new(rar: RockAmRing):
         try:
             uid = re.findall(r"bands_(.*)", file)[0]
             if uid:
+                uid = int(uid)
                 bands = rar.get_new(uid)
                 if bands:
                     rar.send_bands(uid, bands)
