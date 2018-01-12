@@ -57,8 +57,7 @@ class Band:
 
     @classmethod
     def from_line(cls, line: str):
-        name, url = re.findall(r"\[(.*?)\]\((.*?)\)", line)
-        print(name, url)
+        name, url = re.findall(r"\[(.*?)]\((.*?)\)", line.strip())[0]
 
         return cls(name, url)
 
