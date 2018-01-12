@@ -228,7 +228,7 @@ class RockAmRing(Bot):
 
     def new_bands(self, update):
         uid = update.message.chat_id
-        bands = list(self.get_new(uid))
+        bands = self.get_new(uid)
         self.send_bands(uid, bands)
 
     def start(self, update):
