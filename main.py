@@ -188,6 +188,8 @@ class RockAmRing(Bot):
         return bands
 
     def send_bands(self, uid: str, bands: Iterable[Band]):
+        bands = list(bands)
+        bands.sort(key=lambda x: x.name)
         Message(uid, self).send_bands(bands)
 
     def get_bands(self, uid: str) -> Iterable[Band]:
