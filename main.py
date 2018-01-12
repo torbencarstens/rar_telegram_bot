@@ -2,7 +2,7 @@ import json
 import re
 import threading
 import time
-from typing import Dict, List, Iterable, Optional
+from typing import List, Iterable
 
 import requests
 from bs4 import BeautifulSoup, Tag
@@ -32,9 +32,9 @@ def read_latest():
 def write_latest(bands):
     timestamp = time.strftime("%H:%M:%S")
 
-    with open("latest", "a+") as fd:
-        fd.write(timestamp)
-        fd.write("\n".join(bands))
+    with open("latest", "w+") as fd:
+        fd.write(timestamp + "\n")
+        fd.write("\n".join([str(band) for band in bands]))
 
 
 class Band:
@@ -50,14 +50,15 @@ class Band:
         if not link or not span:
             raise ValueError("Couldn't find name/url tag in band div")
 
-        name = span.text
+        name = span.text.strip()
         url = "https://rock-am-ring.de{}".format(link.get('href'))
 
         return cls(name, url)
 
     @classmethod
     def from_line(cls, line: str):
-        url, name = line.split(' ', 1)
+        name, url = re.findall(r"\[(.*?)\]\((.*?)\)", line)
+        print(name, url)
 
         return cls(name, url)
 
@@ -88,6 +89,7 @@ class Message:
                 current = ""
 
             current = seperator.join([current, item])
+        messages.append(current)
 
         return messages
 
@@ -118,9 +120,9 @@ class User:
     def __init__(self, uid):
         self.id = uid
 
-    def write_bands(self, bands: Iterable[str]):
+    def write_bands(self, bands: Iterable[Band]):
         with open("bands_{}".format(self.id), "w+") as fd:
-            fd.write("\n".join(bands))
+            fd.write("\n".join([str(band) for band in bands]))
 
     def get_old_bands(self):
         try:
@@ -138,11 +140,18 @@ class Users(list):
     def __init__(self):
         super().__init__()
 
+        import os
+
+        for file in os.listdir("."):
+            match = re.findall(r"bands_(-?\d+)", file)
+            if match:
+                self.append(User(match))
+
     def get(self, uid: str):
         try:
             return next(filter(lambda user: user.id == uid, self))
         except StopIteration:
-            return None
+            return User(uid)
 
 
 # noinspection PyShadowingNames
@@ -155,8 +164,11 @@ class RockAmRing(Bot):
         super().__init__(token)
 
     @staticmethod
-    def get_band_items() -> List[Band]:
-        latest = read_latest()
+    def get_band_items() -> Iterable[Band]:
+        try:
+            latest = read_latest()
+        except OSError:
+            latest = None
         if latest:
             return latest
 
@@ -239,12 +251,12 @@ if __name__ == "__main__":
 
         schedule(rar)
 
-        dispatcher.add_handler(CommandHandler("bands", rar.bands))
-        dispatcher.add_handler(CommandHandler("neu", rar.new_bands))
-        dispatcher.add_handler(CommandHandler("start", rar.start))
-        dispatcher.add_handler(
-            CommandHandler("status", lambda b, u: b.send_message(chat_id=u.message.chat_id,
-                                                                 text="[{}] Ok".format(u.message.chat_id))))
+        dispatcher.add_handler(CommandHandler("bands", lambda b, u: b.bands(u)))
+        dispatcher.add_handler(CommandHandler("neu", lambda b, u: b.new_bands(u)))
+        dispatcher.add_handler(CommandHandler("start", lambda b, u: b.start()))
+        dispatcher.add_handler(CommandHandler("status",
+                                              lambda b, u: b.send_message(chat_id=u.message.chat_id,
+                                                                          text="[{}] Ok".format(u.message.chat_id))))
 
         updater.start_polling()
     except Exception as e:
