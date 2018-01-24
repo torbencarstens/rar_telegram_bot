@@ -88,12 +88,14 @@ class Message:
         messages = []
         current = ""
 
+        # noinspection PyTypeChecker
+        # can't be None
         for item in content:
             if len(current) + len(item) > max_length:
                 messages.append(current)
                 current = ""
 
-            current = seperator.join([current, item])
+            current = separator.join([current, item])
         messages.append(current)
 
         return messages
@@ -127,6 +129,7 @@ class User:
     bands: Set = field(default=set())
 
     def write_bands(self, bands: Iterable[Band]):
+        self.bands = bands
         with open("bands_{}".format(self.id), "w+") as fd:
             fd.write("\n".join([str(band) for band in bands]))
 
@@ -139,6 +142,7 @@ class User:
 
     def get_new_bands(self, bands: Iterable[Band]) -> Iterable[Band]:
         old_bands = set(self.get_old_bands())
+        self.bands = bands
 
         return set(bands).difference(old_bands)
 
@@ -157,12 +161,14 @@ class Users(list):
                 self.append(User(uid))
 
     def get(self, uid: int):
-        try:
-            return next(filter(lambda user: user.id == uid, self))
-        except StopIteration:
+        users = [user for user in self if user.id == uid]
+        if users:
+            user = users[0]
+        else:
             user = User(uid)
             self.append(user)
-            return user
+
+        return user
 
 
 # noinspection PyShadowingNames
