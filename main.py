@@ -2,7 +2,8 @@ import json
 import re
 import threading
 import time
-from typing import List, Iterable
+from dataclasses import dataclass, field
+from typing import List, Iterable, Optional, Set
 
 import requests
 from bs4 import BeautifulSoup, Tag
@@ -37,10 +38,10 @@ def write_latest(bands):
         fd.write("\n".join([str(band) for band in bands]))
 
 
+@dataclass(frozen=True)
 class Band:
-    def __init__(self, name: str, url: str):
-        self.name = name
-        self.url = url
+    name: str
+    url: str
 
     @classmethod
     def from_soup(cls, div: Tag):
@@ -61,12 +62,6 @@ class Band:
 
         return cls(name, url)
 
-    def __eq__(self, other):
-        return self.name == other.name
-
-    def __hash__(self):
-        return hash(tuple((self.name, self.url)))
-
     def __str__(self):
         if not self.url:
             return self.name
@@ -74,13 +69,18 @@ class Band:
         return "[{}]({})".format(self.name, self.url)
 
 
+@dataclass(frozen=True)
 class Message:
+    uid: int
+    bot: Bot
+    content: List[str] = field(default=None)
+
     def __init__(self, uid: int, bot: Bot, content: List[str] = None):
         self.content = content
         self.uid = uid
         self.bot = bot
 
-    def _split(self, content: List[str] = None, seperator: str = "\n") -> List[str]:
+    def _split(self, content: Optional[Iterable[str]] = None, separator: str = "\n") -> List[str]:
         if not content and not self.content:
             return []
 
@@ -121,9 +121,10 @@ class Message:
 
 
 # noinspection PyShadowingNames
+@dataclass
 class User:
-    def __init__(self, uid: int):
-        self.id = uid
+    id: int
+    bands: Set = field(default=set())
 
     def write_bands(self, bands: Iterable[Band]):
         with open("bands_{}".format(self.id), "w+") as fd:
