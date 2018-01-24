@@ -6,3 +6,11 @@ services:
       context: .
       dockerfile: ./Dockerfile
     image: rar_telegram_bot
+    ports:
+      - "80:80"
+      - "443:443"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.port=3001"
+      - "traefik.frontend.rule=Host:${rar_telegram_bot}"
+      - "traefik.frontend.entryPoints=http"
