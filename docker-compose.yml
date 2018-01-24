@@ -12,5 +12,5 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.port=3001"
-      - "traefik.frontend.rule=Host:${rar_telegram_bot}"
+      - "traefik.frontend.rule=Host:rar_telegram_bot"
       - "traefik.frontend.entryPoints=http"
