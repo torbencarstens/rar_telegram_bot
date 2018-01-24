@@ -1,4 +1,4 @@
-FROM python:3.7-rc
+FROM python:3.7-rc-slim
 MAINTAINER chabare95@gmail.com
 
 WORKDIR /usr/src/app
