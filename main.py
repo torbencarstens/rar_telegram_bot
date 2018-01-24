@@ -75,11 +75,6 @@ class Message:
     bot: Bot
     content: List[str] = field(default=None)
 
-    def __init__(self, uid: int, bot: Bot, content: List[str] = None):
-        self.content = content
-        self.uid = uid
-        self.bot = bot
-
     def _split(self, content: Optional[Iterable[str]] = None, separator: str = "\n") -> List[str]:
         if not content and not self.content:
             return []
@@ -126,7 +121,7 @@ class Message:
 @dataclass
 class User:
     id: int
-    bands: Set = field(default=set())
+    bands: Set = field(default_factory=set)
 
     def write_bands(self, bands: Iterable[Band]):
         self.bands = bands
