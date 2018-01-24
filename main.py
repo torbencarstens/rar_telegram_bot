@@ -267,7 +267,8 @@ if __name__ == "__main__":
         with open("secret.json", "r") as f:
             token = json.load(f)['token']
         import os
-        os.getenv("TELEGRAM_BOT_TOKEN", token)
+
+        token = os.getenv("TELEGRAM_BOT_TOKEN", token)
 
         rar = RockAmRing(token)
         updater = Updater(bot=rar)
