@@ -125,12 +125,12 @@ class User:
 
     def write_bands(self, bands: Iterable[Band]):
         self.bands = bands
-        with open("bands_{}".format(self.id), "w+") as fd:
+        with open("data/bands_{}".format(self.id), "w+") as fd:
             fd.write("\n".join([str(band) for band in bands]))
 
     def get_old_bands(self) -> Iterable[Band]:
         try:
-            with open("bands_{}".format(self.id), "r") as old_bands_fd:
+            with open("data/bands_{}".format(self.id), "r") as old_bands_fd:
                 return [Band.from_line(line) for line in old_bands_fd.readlines()]
         except OSError:
             return []
@@ -150,7 +150,7 @@ class Users(list):
         import os
 
         for file in os.listdir("."):
-            match = re.findall(r"bands_(-?\d+)", file)
+            match = re.findall(r"data/bands_(-?\d+)", file)
             if match:
                 uid = int(match[0])
                 self.append(User(uid))
@@ -243,7 +243,7 @@ def sched_new(rar: RockAmRing):
     import os
     for file in os.listdir("."):
         try:
-            uid = re.findall(r"bands_(.*)", file)[0]
+            uid = re.findall(r"data/bands_(.*)", file)[0]
             if uid:
                 uid = int(uid)
                 bands = rar.get_new(uid)
@@ -269,6 +269,9 @@ if __name__ == "__main__":
         import os
 
         token = os.getenv("TELEGRAM_BOT_TOKEN", token)
+
+        if not (os.path.exists("data") and os.path.isdir("data")):
+            os.mkdir("data")
 
         rar = RockAmRing(token)
         updater = Updater(bot=rar)
